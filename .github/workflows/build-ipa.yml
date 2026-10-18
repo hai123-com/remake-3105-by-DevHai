@@ -1,0 +1,169 @@
+name: DEVHAI PREMIUM • iOS IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Unsigned for inspection OR signed with your Apple credentials'
+        required: true
+        default: unsigned
+        type: choice
+        options:
+          - unsigned
+          - signed
+      export_method:
+        description: 'Provisioning profile type (signed mode only)'
+        required: true
+        default: development
+        type: choice
+        options:
+          - development
+          - ad-hoc
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ inputs.mode }} iOS IPA
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout original modified Xcode source
+        uses: actions/checkout@v4
+
+      - name: Check project, scheme and installed Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          test -s ThreeOneOSFive.xcodeproj/project.pbxproj
+          test -s ThreeOneOSFive.xcodeproj/xcshareddata/xcschemes/3105.xcscheme
+          xcodebuild -list -project ThreeOneOSFive.xcodeproj
+          xcodebuild -resolvePackageDependencies -project ThreeOneOSFive.xcodeproj -scheme 3105
+
+      - name: Prepare output folders
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/devhai-ipa" "$RUNNER_TEMP/devhai-logs"
+          echo "IPA_DIR=$RUNNER_TEMP/devhai-ipa" >> "$GITHUB_ENV"
+          echo "LOG_DIR=$RUNNER_TEMP/devhai-logs" >> "$GITHUB_ENV"
+
+      - name: Build and package unsigned IPA
+        if: inputs.mode == 'unsigned'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -project ThreeOneOSFive.xcodeproj -scheme 3105 \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DevHaiDerived" \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$LOG_DIR/unsigned-build.log"
+          APP="$RUNNER_TEMP/DevHaiDerived/Build/Products/Release-iphoneos/3105.app"
+          test -d "$APP" || { echo 'Compiled app not found' >&2; exit 1; }
+          mkdir -p "$RUNNER_TEMP/DevHaiPayload/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/DevHaiPayload/Payload/3105.app"
+          (cd "$RUNNER_TEMP/DevHaiPayload" && /usr/bin/zip -qry "$IPA_DIR/DEVHAI-PREMIUM-unsigned.ipa" Payload)
+          unzip -t "$IPA_DIR/DEVHAI-PREMIUM-unsigned.ipa" >/dev/null
+          printf '%s\n' 'UNSIGNED — not installable without authorized code signing' > "$IPA_DIR/BUILD-INFO.txt"
+
+      - name: Check signed build secrets
+        if: inputs.mode == 'signed'
+        env:
+          IOS_P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+          IOS_P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+          IOS_PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in IOS_P12_BASE64 IOS_P12_PASSWORD IOS_PROFILE_BASE64 IOS_TEAM_ID IOS_BUNDLE_ID; do
+            test -n "${!name}" || { echo "Missing GitHub Actions secret: $name" >&2; exit 1; }
+          done
+          [[ "$IOS_BUNDLE_ID" != com.apple.* ]] || { echo 'Use your own Apple Developer bundle ID for normal signing.' >&2; exit 1; }
+          echo 'Authorized signing inputs are present.'
+
+      - name: Install Apple certificate and provisioning profile
+        if: inputs.mode == 'signed'
+        shell: bash
+        env:
+          IOS_P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+          IOS_P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+          IOS_PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/devhai-sign.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+          echo "$IOS_P12_BASE64" | base64 -D > "$RUNNER_TEMP/cert.p12"
+          echo "$IOS_PROFILE_BASE64" | base64 -D > "$RUNNER_TEMP/profile.mobileprovision"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 1800 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$IOS_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" > "$RUNNER_TEMP/profile.plist"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/profile.plist")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/profile.plist")
+          PROFILE_TEAM=$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$RUNNER_TEMP/profile.plist")
+          test "$PROFILE_TEAM" = "$IOS_TEAM_ID" || { echo 'Profile does not match team ID' >&2; exit 1; }
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$RUNNER_TEMP/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          echo "PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+          # The original bundle ID is kept in source. Override only in this signed job.
+          plutil -replace CFBundleIdentifier -string "$IOS_BUNDLE_ID" ThreeOneOSFive/Info.plist
+
+      - name: Archive and export signed IPA
+        if: inputs.mode == 'signed'
+        shell: bash
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+        run: |
+          set -euo pipefail
+          IDENTITY='Apple Development'
+          if [ '${{ inputs.export_method }}' = 'ad-hoc' ]; then IDENTITY='Apple Distribution'; fi
+          xcodebuild -project ThreeOneOSFive.xcodeproj -scheme 3105 \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/DevHaiPremium.xcarchive" \
+            DEVELOPMENT_TEAM="$IOS_TEAM_ID" PRODUCT_BUNDLE_IDENTIFIER="$IOS_BUNDLE_ID" \
+            CODE_SIGN_STYLE=Manual "CODE_SIGN_IDENTITY=$IDENTITY" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" archive 2>&1 | tee "$LOG_DIR/signed-archive.log"
+          EXPORT_METHOD='${{ inputs.export_method }}' python3 - <<'PYCODE'
+          import os, plistlib
+          options = {
+              'method': os.environ['EXPORT_METHOD'],
+              'signingStyle': 'manual',
+              'teamID': os.environ['IOS_TEAM_ID'],
+              'provisioningProfiles': {os.environ['IOS_BUNDLE_ID']: os.environ['PROFILE_NAME']},
+          }
+          with open(os.path.join(os.environ['RUNNER_TEMP'], 'exportOptions.plist'), 'wb') as stream:
+              plistlib.dump(options, stream)
+          PYCODE
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/DevHaiPremium.xcarchive" \
+            -exportPath "$RUNNER_TEMP/DevHaiExport" \
+            -exportOptionsPlist "$RUNNER_TEMP/exportOptions.plist" \
+            2>&1 | tee "$LOG_DIR/signed-export.log"
+          IPA=$(find "$RUNNER_TEMP/DevHaiExport" -maxdepth 1 -name '*.ipa' -print -quit)
+          test -n "$IPA" || { echo 'Signed IPA not produced' >&2; exit 1; }
+          cp "$IPA" "$IPA_DIR/DEVHAI-PREMIUM-signed.ipa"
+          printf '%s\n' 'SIGNED — installation requires valid provisioning and device authorization' > "$IPA_DIR/BUILD-INFO.txt"
+
+      - name: Upload verified IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: DEVHAI-PREMIUM-${{ inputs.mode }}-IPA
+          path: ${{ env.IPA_DIR }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DEVHAI-build-failure-logs
+          path: ${{ env.LOG_DIR }}/
+          if-no-files-found: ignore
+          retention-days: 7
