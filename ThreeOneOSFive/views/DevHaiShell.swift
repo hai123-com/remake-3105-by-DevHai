@@ -97,7 +97,7 @@ struct DevHaiLoginView: View {
     }
     private func activate() {
         do { try store.authenticate(enteredKey); enteredKey = ""; error = nil }
-        catch { error = error.localizedDescription }
+        catch { self.error = error.localizedDescription }
     }
 }
 
