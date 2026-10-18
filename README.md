@@ -2,16 +2,16 @@
 
 **DEVHAI PREMIUM** là bản **tùy biến mã nguồn của 3105 v2.0**, không phải ứng dụng được phát triển mới từ đầu. Nền tảng ban đầu do **YangJiii** cùng các tác giả/thành viên đóng góp xây dựng. Bản này thêm nhận diện DEVHAI, giao diện xanh đậm, màn hình nhập key demo, khu vực người dùng và **20 trang quản trị hoạt động trên dữ liệu demo của chính thiết bị**. Mã nguồn chức năng gốc được giữ lại trong `ThreeOneOSFive/`.
 
-> **Trạng thái kiểm thử:** Tất cả tệp Swift mới đã được kiểm tra cú pháp bằng Swift parser, `project.pbxproj` và `Info.plist` đã qua kiểm tra định dạng trên Linux. **Chưa thể chạy `xcodebuild`, chưa xác nhận build trên iOS và chưa tạo IPA**, do không có máy Mac/Xcode và tài khoản ký Apple trong môi trường thực hiện. GitHub Actions được cung cấp để biên dịch và chỉ upload IPA khi lệnh build thực sự thành công.
+> **Trạng thái kiểm thử:** Tất cả tệp Swift mới đã được kiểm tra cú pháp bằng Swift parser, `project.pbxproj` và `Info.plist` đã qua kiểm tra định dạng trên Linux. **Chưa thể chạy `xcodebuild`, chưa xác nhận build trên iOS và chưa tạo IPA trong môi trường này**, do không có máy Mac/Xcode và tài khoản ký Apple trong môi trường thực hiện. GitHub Actions được cung cấp để biên dịch và chỉ upload IPA khi lệnh build thực sự thành công.
 
 ## 1. Hướng dẫn sử dụng
 
 - Tên trên màn hình: `DEVHAI`, giao diện: dark navy + blue, app icon chữ D/DEVHAI riêng.
-- Lần đầu chạy: đăng nhập key demo trước, sau đó hoàn thành onboarding gốc.
+- Lần đầu chạy: đăng nhập key demo trước, sau đó hoàn thành onboarding gốc. Màn hình đăng nhập **không hiển thị các key demo bên dưới ô nhập**.
 - **USER:** `USER123` — có các công cụ hỗ trợ tương thích và quyền truy cập phù hợp.
-- **ADMIN:** `ADMINDEMO` — thêm `Profile → ADMIN PANEL` để vào 20 mục quản trị.
+- **ADMIN:** `ADMINDEMO` — thêm `Home → ADMIN PANEL`, `Profile → ADMIN PANEL` hoặc tab `Admin` để vào 20 mục quản trị.
 - **Files:** vẫn yêu cầu bật `Settings → Developer Mode` theo cơ chế hiển thị cũ. Việc hiển thị không cấp thêm đặc quyền hay vượt qua sandbox.
-- **Các tab:** Home, Discover (repository, new, sources, search), Files, Tools (patch, wallpaper, cleaner, logs), Profile.
+- **Các tab:** Home, Discover (repository, new, sources, search), Files, Tools (patch, wallpaper, cleaner, logs), Profile; tài khoản ADMIN có thêm tab Admin (trên iPhone có thể nằm trong More nếu thanh tab quá nhiều mục).
 - Login session được lưu trong **iOS Keychain**, có ngày hết hạn và xác thực lại trạng thái license khi app hoạt động.
 
 ### 20 mục Admin Panel

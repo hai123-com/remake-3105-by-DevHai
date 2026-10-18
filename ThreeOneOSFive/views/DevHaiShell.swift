@@ -62,16 +62,8 @@ struct DevHaiLoginView: View {
                             .disabled(enteredKey.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
                     }
-                    if store.demoMode {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("DEMO MODE • Local only").font(.caption.bold()).foregroundStyle(AppTheme.cyan)
-                            Text("USER123  •  Standard user").font(.caption)
-                            Text("ADMINDEMO  •  Administrator").font(.caption)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(14)
-                        .background(AppTheme.cardSurface.opacity(0.8), in: RoundedRectangle(cornerRadius: 16))
-                    } else {
-                        Text("Production backend not yet integrated. This build cannot activate real keys.")
+                    if !store.demoMode {
+                        Text("A production authentication service is required to activate remote licenses.")
                             .font(.caption).foregroundStyle(.orange)
                     }
                     Spacer(minLength: 32)
@@ -135,6 +127,32 @@ struct DevHaiHomeView: View {
                               systemImage: appState.isSupported ? "checkmark.circle" : "exclamationmark.triangle")
                             .font(.caption)
                             .foregroundStyle(appState.isSupported ? .green : .orange)
+                    }
+                    // The administrator entry is intentionally visible immediately on Home,
+                    // not buried inside Profile. The destination still checks the session role.
+                    if store.isAdmin {
+                        NavigationLink {
+                            DevHaiAdminPanel()
+                        } label: {
+                            DHGlassCard {
+                                HStack(spacing: 16) {
+                                    Image(systemName: "crown.fill")
+                                        .font(.system(size: 25, weight: .semibold))
+                                        .foregroundStyle(AppTheme.cyan)
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text("ADMIN PANEL")
+                                            .font(.headline.bold()).foregroundStyle(.white)
+                                        Text("Open 20 management modules")
+                                            .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                                    }
+                                    Spacer(minLength: 0)
+                                    Image(systemName: "chevron.right")
+                                        .font(.headline).foregroundStyle(AppTheme.cyan)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open DEVHAI Admin Panel")
                     }
                     Text("QUICK ACCESS").font(.caption.bold()).tracking(2).foregroundStyle(AppTheme.secondaryText)
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {

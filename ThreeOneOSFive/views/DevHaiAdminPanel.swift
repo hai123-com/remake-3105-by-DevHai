@@ -65,53 +65,67 @@ struct DevHaiAdminPanel: View {
     @State private var search = ""
     private let columns = [GridItem(.adaptive(minimum: 142), spacing: 12)]
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    DHGlassCard {
-                        HStack(spacing: 14) {
-                            Image(systemName: "crown.fill").font(.system(size: 28)).foregroundStyle(AppTheme.accent)
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text("ADMIN CONTROL CENTER").font(.headline).bold()
-                                Text("20 local demo modules • DevHai").font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                    }
-                    TextField("Search admin features", text: $search)
-                        .textFieldStyle(.roundedBorder)
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(DHAdminModule.allCases.filter { search.isEmpty || $0.title.localizedCaseInsensitiveContains(search) }) { module in
-                            NavigationLink(value: module) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Image(systemName: module.symbol).font(.title2).foregroundStyle(AppTheme.accent)
-                                    Spacer(minLength: 0)
-                                    Text(module.title).font(.subheadline.weight(.semibold))
-                                        .multilineTextAlignment(.leading).foregroundStyle(.white)
-                                    Text(String(format: "%02d", module.rawValue)).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+        Group {
+            if store.isAdmin && store.demoMode {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        DHGlassCard {
+                            HStack(spacing: 14) {
+                                Image(systemName: "crown.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundStyle(AppTheme.accent)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text("ADMIN CONTROL CENTER")
+                                        .font(.headline.bold())
+                                    Text("20 local demo modules • DevHai")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
-                                .frame(maxWidth: .infinity, minHeight: 114, alignment: .leading)
-                                .padding(14)
-                                .background(AppTheme.cardSurface, in: RoundedRectangle(cornerRadius: 21))
-                                .overlay(RoundedRectangle(cornerRadius: 21).stroke(AppTheme.cardBorder, lineWidth: 1))
+                                Spacer(minLength: 0)
                             }
-                            .buttonStyle(.plain)
+                        }
+                        TextField("Search admin features", text: $search)
+                            .textFieldStyle(.roundedBorder)
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(DHAdminModule.allCases.filter {
+                                search.isEmpty || $0.title.localizedCaseInsensitiveContains(search)
+                            }) { module in
+                                // Explicit destination is reliable in both the Admin tab
+                                // and the existing Home / Profile navigation stacks.
+                                NavigationLink {
+                                    DevHaiAdminDetail(module: module)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        Image(systemName: module.symbol)
+                                            .font(.title2)
+                                            .foregroundStyle(AppTheme.accent)
+                                        Spacer(minLength: 0)
+                                        Text(module.title)
+                                            .font(.subheadline.weight(.semibold))
+                                            .multilineTextAlignment(.leading)
+                                            .foregroundStyle(.white)
+                                        Text(String(format: "%02d", module.rawValue))
+                                            .font(.caption2.monospacedDigit())
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .frame(maxWidth: .infinity, minHeight: 114, alignment: .leading)
+                                    .padding(14)
+                                    .background(AppTheme.cardSurface, in: RoundedRectangle(cornerRadius: 21))
+                                    .overlay(RoundedRectangle(cornerRadius: 21).stroke(AppTheme.cardBorder, lineWidth: 1))
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
+                    .padding(16)
                 }
-                .padding(16)
-            }
-            .background(AppTheme.pageBackground)
-            .navigationTitle("DEVHAI ADMIN")
-            .navigationDestination(for: DHAdminModule.self) { module in
-                DevHaiAdminDetail(module: module)
-            }
-            .overlay {
-                if !store.requireAdmin() {
-                    ContentUnavailableViewCompat(message: "Administrator access required")
-                }
+            } else {
+                ContentUnavailableViewCompat(message: "Administrator access required")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .background(AppTheme.pageBackground)
+        .navigationTitle("DEVHAI ADMIN")
         .tint(AppTheme.accent)
     }
 }

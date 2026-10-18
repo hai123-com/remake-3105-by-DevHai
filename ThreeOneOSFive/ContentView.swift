@@ -31,7 +31,7 @@ struct ContentView: View {
     }
     private var compactLayout: some View {
         TabView(selection: Binding(get: { tabNavigation.selectedTab }, set: { tabNavigation.select($0) })) {
-            ForEach(AppSection.allCases) { section in
+            ForEach(AppSection.allCases.filter { $0 != .admin || devHai.isAdmin }) { section in
                 sectionContent(section)
                     .tabItem { Label(section.title, systemImage: section.systemImage) }
                     .tag(section.rawValue)
@@ -77,6 +77,14 @@ struct ContentView: View {
             DevHaiToolsView(onOpenSettings: openSettings, onOpenLogs: openLogs)
         case .profile:
             DevHaiProfileView()
+        case .admin:
+            if devHai.isAdmin && devHai.demoMode {
+                NavigationStack {
+                    DevHaiAdminPanel()
+                }
+            } else {
+                restricted("Administrator access required")
+            }
         }
     }
     private func openSettings() { showSettings = true }
@@ -91,6 +99,7 @@ extension AppSection {
         case .files: return "Files"
         case .tools: return "Tools"
         case .profile: return "Profile"
+        case .admin: return "Admin"
         }
     }
     var systemImage: String {
@@ -100,6 +109,7 @@ extension AppSection {
         case .files: return "folder.fill"
         case .tools: return "hammer.fill"
         case .profile: return "person.crop.circle.fill"
+        case .admin: return "crown.fill"
         }
     }
 }

@@ -6,6 +6,8 @@ enum AppSection: Int, CaseIterable, Identifiable {
     case files
     case tools
     case profile
+    // Admin-only tab. Appends without changing original tab identifiers.
+    case admin
 
     var id: Int { rawValue }
 }
